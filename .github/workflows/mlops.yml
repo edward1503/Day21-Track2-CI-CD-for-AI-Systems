@@ -31,7 +31,9 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run unit tests
-        run: pytest tests/ -v
+        run: |
+          rm -rf mlruns
+          pytest tests/ -v
 
 
   # ---------------------------------------------------------------------------
