@@ -48,8 +48,8 @@ def train(
         # Bonus 5: Cảnh báo lệch lạc dữ liệu
         class_dist = y_train.value_counts(normalize=True).to_dict()
         for cls, pct in class_dist.items():
-            if pct < 0.1:
-                print(f"WARNING: Lớp {cls} chỉ chiếm {pct:.2%} (< 10%) tổng số mẫu. Dữ liệu bị lệch!")
+            if pct < 0.25:
+                print(f"WARNING: Lớp {cls} chỉ chiếm {pct:.2%} (< 25%) tổng số mẫu. Dữ liệu bị lệch!")
 
         # Bonus 2: Lựa chọn thuật toán
         model_type = params.get("model_type", "random_forest")
