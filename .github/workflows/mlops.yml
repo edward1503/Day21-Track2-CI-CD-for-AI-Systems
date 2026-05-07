@@ -69,6 +69,10 @@ jobs:
 
       - name: Train model
         run: python src/train.py
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
 
       - name: Read metrics
         id: read_metrics
@@ -84,7 +88,8 @@ jobs:
           s3_client = boto3.client('s3')
           bucket_name = os.environ["CLOUD_BUCKET"]
           s3_client.upload_file("models/model.pkl", bucket_name, "models/latest/model.pkl")
-          print("Model uploaded successfully to S3.")
+          s3_client.upload_file("outputs/metrics.json", bucket_name, "metrics/latest/metrics.json")
+          print("Model and metrics uploaded successfully to S3.")
           EOF
         env:
           CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
@@ -93,7 +98,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: metrics
-          path: outputs/metrics.json
+          path: |
+            outputs/metrics.json
+            outputs/report.txt
 
 
   # ---------------------------------------------------------------------------
@@ -109,11 +116,37 @@ jobs:
       - name: Check eval gate
         run: |
           python - <<'EOF'
+          import os
+          import json
+          import boto3
+
           acc = float("${{ needs.train.outputs.accuracy }}")
+          
+          # Bonus 4: So sanh accuracy voi model cu tren S3 de quyet dinh rollback
+          s3_client = boto3.client('s3')
+          bucket_name = os.environ["CLOUD_BUCKET"]
+          old_acc = 0.0
+          try:
+              s3_client.download_file(bucket_name, "metrics/latest/metrics.json", "old_metrics.json")
+              with open("old_metrics.json") as f:
+                  old_metrics = json.load(f)
+                  old_acc = old_metrics.get("accuracy", 0.0)
+              print(f"Old accuracy tren S3: {old_acc:.4f}")
+          except Exception as e:
+              print("Khong tim thay metrics cu hoac loi download. Gia dinh old accuracy la 0.0")
+
+          if acc < old_acc:
+              raise SystemExit(f"FAILED (Bonus 4): Accuracy moi ({acc:.4f}) thap hon accuracy cu ({old_acc:.4f}). Huy deploy de tranh ha cap he thong!")
+              
           if acc < 0.70:
               raise SystemExit(f"FAILED: accuracy {acc:.4f} < 0.70. Huy deploy.")
           print(f"PASSED: accuracy {acc:.4f} >= 0.70. Dang trien khai model.")
           EOF
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
 
 
   # ---------------------------------------------------------------------------

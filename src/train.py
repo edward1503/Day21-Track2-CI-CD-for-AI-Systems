@@ -5,8 +5,9 @@ import yaml
 import json
 import joblib
 import os
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, classification_report
 
 EVAL_THRESHOLD = 0.70
 
@@ -29,20 +30,40 @@ def train(
     from pathlib import Path
     import tempfile
     
-    if os.getenv("CI"):
-        mlflow_dir = Path(tempfile.mkdtemp(prefix="mlruns_"))
+    if os.getenv("MLFLOW_TRACKING_URI"):
+        # Bonus 1: Use DagsHub tracking URI
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     else:
-        mlflow_dir = Path("mlruns").resolve()
-
-    mlflow.set_tracking_uri(mlflow_dir.as_uri())
+        if os.getenv("CI"):
+            mlflow_dir = Path(tempfile.mkdtemp(prefix="mlruns_"))
+        else:
+            mlflow_dir = Path("mlruns").resolve()
+        mlflow.set_tracking_uri(mlflow_dir.as_uri())
     mlflow.set_experiment("day21")
 
     with mlflow.start_run():
         # TODO 3: Log params
         mlflow.log_params(params)
 
-        # TODO 4: Khởi tạo và train
-        model = RandomForestClassifier(**params, random_state=42)
+        # Bonus 5: Cảnh báo lệch lạc dữ liệu
+        class_dist = y_train.value_counts(normalize=True).to_dict()
+        for cls, pct in class_dist.items():
+            if pct < 0.1:
+                print(f"WARNING: Lớp {cls} chỉ chiếm {pct:.2%} (< 10%) tổng số mẫu. Dữ liệu bị lệch!")
+
+        # Bonus 2: Lựa chọn thuật toán
+        model_type = params.get("model_type", "random_forest")
+        model_params = params.get(model_type, params) # fallback for old params format
+
+        if model_type == "random_forest":
+            model = RandomForestClassifier(**model_params, random_state=42)
+        elif model_type == "gradient_boosting":
+            model = GradientBoostingClassifier(**model_params, random_state=42)
+        elif model_type == "logistic_regression":
+            model = LogisticRegression(**model_params, random_state=42, max_iter=1000)
+        else:
+            raise ValueError(f"Không hỗ trợ thuật toán: {model_type}")
+
         model.fit(X_train, y_train)
 
         # TODO 5: Đánh giá
@@ -58,10 +79,21 @@ def train(
         # TODO 7: In kết quả
         print(f"Accuracy: {acc:.4f} | F1: {f1:.4f}")
 
-        # TODO 8: Lưu metrics.json
+        # Bonus 3: Báo cáo hiệu suất tự động
+        cm = confusion_matrix(y_eval, preds)
+        cr = classification_report(y_eval, preds, zero_division=0)
+        
         os.makedirs("outputs", exist_ok=True)
+        with open("outputs/report.txt", "w", encoding="utf-8") as f:
+            f.write(f"Model Type: {model_type}\n\n")
+            f.write("Confusion Matrix:\n")
+            f.write(str(cm))
+            f.write("\n\nClassification Report:\n")
+            f.write(cr)
+
+        # TODO 8: Lưu metrics.json (Kèm Bonus 5)
         with open("outputs/metrics.json", "w") as f:
-            json.dump({"accuracy": acc, "f1_score": f1}, f)
+            json.dump({"accuracy": acc, "f1_score": f1, "train_distribution": class_dist}, f)
 
         # TODO 9: Lưu model.pkl
         os.makedirs("models", exist_ok=True)
