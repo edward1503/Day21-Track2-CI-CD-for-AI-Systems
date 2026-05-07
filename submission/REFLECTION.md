@@ -60,5 +60,35 @@ Hệ thống CI/CD đã tự động nhận diện dữ liệu mới, kích ho�
    - Sử dụng các trình quản lý process như Gunicorn. Khi nhận được lệnh restart/reload, Gunicorn không tắt ngay lập tức các worker cũ đang xử lý request. Nó sẽ gọi một worker mới ở chế độ nền để load mô hình mới. Chỉ khi worker mới load xong 100% lên bộ nhớ RAM, Gunicorn mới từ từ điều phối request sang đó và khai tử worker cũ.
 
 3. **Cơ chế Fallback Logic trong Code:**
-   - Viết logic trong mã nguồn để load mô hình mới vào một biến phụ (`new_model`). 
    - Kiểm tra xem biến phụ có sẵn sàng không. Nếu gặp lỗi `Exception` khi đọc file `model.pkl` đang bị tải dở, biến chính `model` vẫn sẽ trỏ vào phiên bản cũ trong RAM. Điều này tránh việc API ném lỗi HTTP 503 khi người dùng vô tình gọi trúng lúc file model đang được ghi chèn lên (overwrite).
+
+---
+
+## 5. Kết quả Bonus (Extra 20 điểm)
+
+Để hoàn thành mục tiêu 100 điểm, toàn bộ 5 thách thức nâng cao đã được lập trình và tích hợp vào hệ thống:
+
+### Bonus 1: Tracking MLflow Từ Xa Với DagsHub
+- **Thực hiện:** Cấu hình biến môi trường `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` từ GitHub Secrets. Script `train.py` tự động nhận diện biến môi trường và đẩy toàn bộ lịch sử huấn luyện lên DagsHub thay vì lưu cục bộ.
+- **Minh chứng:**
+![Bonus 1 - DagsHub Tracking](submission/screenshots/BONUS-1.png)
+
+### Bonus 2: Thí Nghiệm Với Nhiều Thuật Toán
+- **Thực hiện:** Thiết kế lại file `params.yaml` chứa tham số cho 3 thuật toán: `random_forest`, `gradient_boosting`, và `logistic_regression`. Trong `src/train.py`, hệ thống đọc biến `model_type` và linh hoạt khởi tạo thuật toán tương ứng.
+- **Minh chứng:**
+![Bonus 2 - Multi Algorithm](submission/screenshots/BONUS-2.png)
+
+### Bonus 3: Báo Cáo Hiệu Suất Tự Động
+- **Thực hiện:** Bổ sung tính toán `confusion_matrix` và `classification_report` vào code huấn luyện, xuất ra file `outputs/report.txt`. Cập nhật `mlops.yml` để GitHub Actions đóng gói file này thành Artifact cho phép tải xuống.
+- **Minh chứng:**
+![Bonus 3 - Auto Report](submission/screenshots/BONUS-3.png)
+
+### Bonus 4: Hoàn Trả Về Phiên Bản Trước (Rollback)
+- **Thực hiện:** Cuối Job Train, file `metrics.json` được upload lên bucket S3 để lưu trữ. Tại Job Eval, hệ thống dùng `boto3` tải metrics cũ về và so sánh. Nếu mô hình mới có độ chính xác thấp hơn mô hình cũ, Pipeline sẽ ném ra lỗi (Exit 1) và chặn đứng Job Deploy để bảo vệ hệ thống.
+- **Minh chứng:**
+![Bonus 4 - Rollback Old Version](submission/screenshots/BONUS-4.png)
+
+### Bonus 5: Cảnh Báo Lệch Lạc Dữ Liệu (Data Drift)
+- **Thực hiện:** Sử dụng Pandas tính toán phần trăm phân phối các nhãn (0, 1, 2) trong tập `y_train`. Nếu có lớp nào chiếm tỷ lệ quá nhỏ, hệ thống sẽ in ra màn hình cảnh báo `WARNING`. Tỷ lệ này cũng được lưu kèm vào `metrics.json`. *(Để chụp ảnh minh chứng, ngưỡng cảnh báo đã được nâng lên 25% nhằm bắt lỗi lớp thiểu số).*
+- **Minh chứng:**
+![Bonus 5 - Data Drift Warning](submission/screenshots/BONUS-5.png)
