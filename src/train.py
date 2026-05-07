@@ -26,6 +26,17 @@ def train(
     X_eval = df_eval.drop(columns=["target"])
     y_eval = df_eval["target"]
 
+    from pathlib import Path
+    import tempfile
+    
+    if os.getenv("CI"):
+        mlflow_dir = Path(tempfile.mkdtemp(prefix="mlruns_"))
+    else:
+        mlflow_dir = Path("mlruns").resolve()
+
+    mlflow.set_tracking_uri(mlflow_dir.as_uri())
+    mlflow.set_experiment("day21")
+
     with mlflow.start_run():
         # TODO 3: Log params
         mlflow.log_params(params)
