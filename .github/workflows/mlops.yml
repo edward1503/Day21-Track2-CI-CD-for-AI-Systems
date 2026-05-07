@@ -125,6 +125,16 @@ jobs:
     needs: eval
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy files to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "src/serve.py"
+          target: "/home/ubuntu"
 
       - name: SSH deploy to VM
         uses: appleboy/ssh-action@v1.0.3
