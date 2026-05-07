@@ -1,0 +1,17 @@
+Model Type: random_forest
+
+Confusion Matrix:
+[[141  30   2]
+ [ 46 168  13]
+ [  0  35  65]]
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.75      0.82      0.78       173
+           1       0.72      0.74      0.73       227
+           2       0.81      0.65      0.72       100
+
+    accuracy                           0.75       500
+   macro avg       0.76      0.74      0.75       500
+weighted avg       0.75      0.75      0.75       500
